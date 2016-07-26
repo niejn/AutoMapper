@@ -1,87 +1,133 @@
-using System;
-using System.Runtime.Serialization;
-
 namespace AutoMapper
 {
-#if !SILVERLIGHT
-	[Serializable]
-#endif
-	public class AutoMapperConfigurationException : Exception
-	{
-		//
-		// For guidelines regarding the creation of new exception types, see
-		//    http://msdn.microsoft.com/library/default.asp?url=/library/en-us/cpgenref/html/cpconerrorraisinghandlingguidelines.asp
-		// and
-		//    http://msdn.microsoft.com/library/default.asp?url=/library/en-us/dncscol/html/csharp07192001.asp
-		//
+    using System;
+    using System.Linq;
+    using System.Text;
 
-		public AutoMapperConfigurationException()
-		{
-		}
+    public class AutoMapperConfigurationException : Exception
+    {
+        public TypeMapConfigErrors[] Errors { get; }
+        public TypePair? Types { get; }
+        public PropertyMap PropertyMap { get; set; }
 
-		public AutoMapperConfigurationException(string message) : base(message)
-		{
-		}
+        public class TypeMapConfigErrors
+        {
+            public TypeMap TypeMap { get; }
+            public string[] UnmappedPropertyNames { get; }
+            public bool CanConstruct { get; }
 
-		public AutoMapperConfigurationException(string message, Exception inner) : base(message, inner)
-		{
-		}
+            public TypeMapConfigErrors(TypeMap typeMap, string[] unmappedPropertyNames, bool canConstruct)
+            {
+                TypeMap = typeMap;
+                UnmappedPropertyNames = unmappedPropertyNames;
+                CanConstruct = canConstruct;
+            }
+        }
 
-		public AutoMapperConfigurationException(TypeMap typeMap, string[] unmappedPropertyNames)
-			: base(string.Format(
-					"The following {3} properties on {0} are not mapped: \n\t{2}\nAdd a custom mapping expression, ignore, or rename the property on {1}.",
-					typeMap.DestinationType.FullName, typeMap.SourceType.FullName, string.Join("\n\t", unmappedPropertyNames),
-					unmappedPropertyNames.Length))
-		{
-		}
+        public AutoMapperConfigurationException(string message)
+            : base(message)
+        {
+        }
 
-		public AutoMapperConfigurationException(TypeMap typeMap, string mismatchedPropertyName)
-			: base(string.Format(
-					"The following property on {0} cannot be mapped: \n\t{2}\nAdd a custom mapping expression, ignore, add a custom resolver, or modify the destination type {1}.",
-					typeMap.DestinationType.FullName, typeMap.SourceType.FullName, mismatchedPropertyName))
-		{
-		}
+        protected AutoMapperConfigurationException(string message, Exception inner)
+            : base(message, inner)
+        {
+        }
 
-		public AutoMapperConfigurationException(ResolutionContext context)
-		{
-			Context = context;
-		}
+        public AutoMapperConfigurationException(TypeMapConfigErrors[] errors)
+        {
+            Errors = errors;
+        }
 
-#if !SILVERLIGHT
-		protected AutoMapperConfigurationException(
-			SerializationInfo info,
-			StreamingContext context) : base(info, context)
-		{
-		}
-#endif
+        public AutoMapperConfigurationException(TypePair types)
+        {
+            Types = types;
+        }
 
-		public ResolutionContext Context { get; private set; }
+        public override string Message
+        {
+            get
+            {
+                if (Types != null)
+                {
+                    var message =
+                        string.Format(
+                            "The following property on {0} cannot be mapped: \n\t{2}\nAdd a custom mapping expression, ignore, add a custom resolver, or modify the destination type {1}.",
+                            Types?.DestinationType.FullName, Types?.DestinationType.FullName,
+                            PropertyMap?.DestinationProperty.Name);
 
-		public override string Message
-		{
-			get
-			{
-				if (Context != null)
-				{
-					var contextToUse = Context;
-					var message = string.Format("The following property on {0} cannot be mapped: \n\t{2}\nAdd a custom mapping expression, ignore, add a custom resolver, or modify the destination type {1}.",
-						contextToUse.DestinationType.FullName, contextToUse.SourceType.FullName, contextToUse.GetContextPropertyMap().DestinationProperty.Name);
+                    message += "\nContext:";
 
-					message += "\nContext:";
+                    Exception exToUse = this;
+                    while (exToUse != null)
+                    {
+                        var configExc = exToUse as AutoMapperConfigurationException;
+                        if (configExc != null)
+                        { message += configExc.PropertyMap == null
+                            ? string.Format("\n\tMapping from type {1} to {0}", configExc.Types?.DestinationType.FullName,
+                                configExc.Types?.SourceType.FullName)
+                            : string.Format("\n\tMapping to property {0} from {2} to {1}",
+                                configExc.PropertyMap.DestinationProperty.Name,
+                                configExc.Types?.DestinationType.FullName, configExc.Types?.SourceType.FullName);
+                        }
 
-					while (contextToUse != null)
-					{
-						message += contextToUse.GetContextPropertyMap() == null
-						           	? string.Format("\n\tMapping to type {0} from source type {1}", contextToUse.DestinationType.FullName, contextToUse.SourceType.FullName)
-						           	: string.Format("\n\tMapping to property {0} of type {1} from source type {2}", contextToUse.GetContextPropertyMap().DestinationProperty.Name, contextToUse.DestinationType.FullName, contextToUse.SourceType.FullName);
-						contextToUse = contextToUse.Parent;
-					}
+                        exToUse = exToUse.InnerException;
+                    }
 
-					return message + "\n" + base.Message;
-				}
-				return base.Message;
-			}
-		}
+                    return message + "\n" + base.Message;
+                }
+                if (Errors != null)
+                {
+                    var message =
+                        new StringBuilder(
+                            "\nUnmapped members were found. Review the types and members below.\nAdd a custom mapping expression, ignore, add a custom resolver, or modify the source/destination type\nFor no matching constructor, add a no-arg ctor, add optional arguments, or map all of the constructor parameters\n");
 
-	}
+                    foreach (var error in Errors)
+                    {
+                        var len = error.TypeMap.SourceType.FullName.Length +
+                                  error.TypeMap.DestinationType.FullName.Length + 5;
+
+                        message.AppendLine(new string('=', len));
+                        message.AppendLine(error.TypeMap.SourceType.Name + " -> " + error.TypeMap.DestinationType.Name +
+                                           " (" +
+                                           error.TypeMap.ConfiguredMemberList + " member list)");
+                        message.AppendLine(error.TypeMap.SourceType.FullName + " -> " +
+                                           error.TypeMap.DestinationType.FullName + " (" +
+                                           error.TypeMap.ConfiguredMemberList + " member list)");
+                        message.AppendLine();
+
+                        if (error.UnmappedPropertyNames.Any())
+                        {
+                            message.AppendLine("Unmapped properties:");
+                            foreach (var name in error.UnmappedPropertyNames)
+                            {
+                                message.AppendLine(name);
+                            }
+                        }
+                        if (!error.CanConstruct)
+                        {
+                            message.AppendLine("No available constructor.");
+                        }
+                    }
+                    return message.ToString();
+                }
+                return base.Message;
+            }
+        }
+
+        public override string StackTrace
+        {
+            get
+            {
+                if (Errors != null)
+                    return string.Join(Environment.NewLine,
+                        base.StackTrace
+                            .Split(new[] {Environment.NewLine}, StringSplitOptions.None)
+                            .Where(str => !str.TrimStart().StartsWith("at AutoMapper."))
+                            .ToArray());
+
+                return base.StackTrace;
+            }
+        }
+    }
 }

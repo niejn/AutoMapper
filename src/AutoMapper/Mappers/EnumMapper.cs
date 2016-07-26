@@ -1,74 +1,131 @@
-using System;
-using System.Linq;
+using System.ComponentModel;
+using System.Linq.Expressions;
+using static System.Linq.Expressions.Expression;
 
 namespace AutoMapper.Mappers
 {
-    public class EnumMapper : IObjectMapper
+    using System;
+    using System.Reflection;
+    using System.Linq;
+    
+    public class StringToEnumMapper : IObjectMapper
     {
-        public object Map(ResolutionContext context, IMappingEngineRunner mapper)
+        public static TDestination Map<TDestination>(string source)
         {
-            bool toEnum = false;
-            Type enumSourceType = TypeHelper.GetEnumerationType(context.SourceType);
-        	Type enumDestinationType = TypeHelper.GetEnumerationType(context.DestinationType);
-
-            if (EnumToStringMapping(context, ref toEnum))
-            {
-                if (toEnum)
-                {
-					return Enum.Parse(enumDestinationType, context.SourceValue.ToString(), true);
-                }
-                return Enum.GetName(enumSourceType, context.SourceValue);
-            }
-            if (EnumToEnumMapping(context))
-            {
-                if (context.SourceValue == null)
-                {
-                    return mapper.CreateObject(context);
-                }
-
-                if (!Enum.IsDefined(enumSourceType, context.SourceValue))
-                {
-					return Enum.ToObject(enumDestinationType, context.SourceValue);
-                }
-
-#if !SILVERLIGHT
-				if (!Enum.GetNames(enumDestinationType).Contains(context.SourceValue.ToString()))
-                {
-                    Type underlyingSourceType = Enum.GetUnderlyingType(enumSourceType);
-                    var underlyingSourceValue = Convert.ChangeType(context.SourceValue, underlyingSourceType);
-
-                    return Enum.ToObject(context.DestinationType, underlyingSourceValue);
-                }
-#endif
-
-				return Enum.Parse(enumDestinationType, Enum.GetName(enumSourceType, context.SourceValue), true);
-            }
-            if (EnumToUnderlyingTypeMapping(context, ref toEnum))
-            {
-                if (toEnum)
-                {
-					return Enum.Parse(enumDestinationType, context.SourceValue.ToString(), true);
-                }
-                return Convert.ChangeType(context.SourceValue, context.DestinationType, null);
-            }
-            return null;
+            if (string.IsNullOrEmpty(source))
+                return default(TDestination);
+            return (TDestination)Enum.Parse(typeof(TDestination), source, true);
         }
 
-        public bool IsMatch(ResolutionContext context)
+        private static readonly MethodInfo MapMethodInfo = typeof(StringToEnumMapper).GetAllMethods().First(_ => _.IsStatic);
+
+        public bool IsMatch(TypePair context)
         {
-            bool toEnum = false;
-            return EnumToStringMapping(context, ref toEnum) || EnumToEnumMapping(context) || EnumToUnderlyingTypeMapping(context, ref toEnum);
+            var destEnumType = TypeHelper.GetEnumerationType(context.DestinationType);
+            return destEnumType != null && context.SourceType == typeof(string);
         }
 
-        private static bool EnumToEnumMapping(ResolutionContext context)
+        public Expression MapExpression(TypeMapRegistry typeMapRegistry, IConfigurationProvider configurationProvider, PropertyMap propertyMap, Expression sourceExpression, Expression destExpression, Expression contextExpression)
         {
-            // Enum to enum mapping
+            return Call(null, MapMethodInfo.MakeGenericMethod(destExpression.Type), sourceExpression);
+        }
+    }
+
+    public class EnumToEnumMapper : IObjectMapper
+    {
+        public static TDestination Map<TSource, TDestination>(TSource source)
+        {
+            if (source == null)
+                return default(TDestination);
+
+            var sourceEnumType = TypeHelper.GetEnumerationType(typeof(TSource));
+            var destEnumType = TypeHelper.GetEnumerationType(typeof(TDestination));
+
+            if (!Enum.IsDefined(sourceEnumType, source))
+            {
+                return (TDestination)Enum.ToObject(destEnumType, source);
+            }
+
+            if (!Enum.GetNames(destEnumType).Contains(source.ToString()))
+            {
+                Type underlyingSourceType = Enum.GetUnderlyingType(sourceEnumType);
+                var underlyingSourceValue = Convert.ChangeType(source, underlyingSourceType);
+
+                return (TDestination)Enum.ToObject(destEnumType, underlyingSourceValue);
+            }
+
+            return (TDestination)Enum.Parse(destEnumType, Enum.GetName(sourceEnumType, source), true);
+        }
+
+        private static readonly MethodInfo MapMethodInfo = typeof(EnumToEnumMapper).GetAllMethods().First(_ => _.IsStatic);
+
+        public bool IsMatch(TypePair context)
+        {
             var sourceEnumType = TypeHelper.GetEnumerationType(context.SourceType);
             var destEnumType = TypeHelper.GetEnumerationType(context.DestinationType);
             return sourceEnumType != null && destEnumType != null;
         }
 
-        private static bool EnumToUnderlyingTypeMapping(ResolutionContext context, ref bool toEnum)
+        public Expression MapExpression(TypeMapRegistry typeMapRegistry, IConfigurationProvider configurationProvider, PropertyMap propertyMap, Expression sourceExpression, Expression destExpression, Expression contextExpression)
+        {
+            return Call(null, MapMethodInfo.MakeGenericMethod(sourceExpression.Type, destExpression.Type), sourceExpression);
+        }
+    }
+
+    public class EnumToUnderlyingTypeMapper : IObjectMapper
+    {
+        public static TDestination Map<TSource, TDestination>(TSource source)
+        {
+            bool toEnum = false;
+            Type enumDestinationType = TypeHelper.GetEnumerationType(typeof(TDestination));
+            var typePair = new TypePair(typeof (TSource), typeof (TDestination));
+            EnumToUnderlyingTypeMapping(typePair, ref toEnum);
+
+            if (toEnum && source != null)
+            {
+                return (TDestination)Enum.Parse(enumDestinationType, source.ToString(), true);
+            }
+
+            if (EnumToNullableTypeMapping(typePair))
+            {
+                return ConvertEnumToNullableType<TSource, TDestination>(source);
+            }
+
+            return (TDestination)Convert.ChangeType(source, typeof(TDestination), null);
+        }
+
+        internal static bool EnumToNullableTypeMapping(TypePair context)
+        {
+            if (!context.DestinationType.IsGenericType())
+            {
+                return false;
+            }
+
+            var genericType = context.DestinationType.GetGenericTypeDefinition();
+
+            return genericType == typeof(Nullable<>);
+        }
+
+        private static TDestination ConvertEnumToNullableType<TSource, TDestination>(TSource source)
+        {
+            if (source == null)
+            {
+                return default(TDestination);
+            }
+
+            var destType = Nullable.GetUnderlyingType(typeof(TDestination));
+            return (TDestination)Convert.ChangeType(source, destType, null);
+        }
+
+        private static readonly MethodInfo MapMethodInfo = typeof(EnumToUnderlyingTypeMapper).GetAllMethods().First(_ => _.IsStatic);
+
+        public bool IsMatch(TypePair context)
+        {
+            bool toEnum = false;
+            return EnumToUnderlyingTypeMapping(context, ref toEnum);
+        }
+
+        private static bool EnumToUnderlyingTypeMapping(TypePair context, ref bool toEnum)
         {
             var sourceEnumType = TypeHelper.GetEnumerationType(context.SourceType);
             var destEnumType = TypeHelper.GetEnumerationType(context.DestinationType);
@@ -76,32 +133,20 @@ namespace AutoMapper.Mappers
             // Enum to underlying type
             if (sourceEnumType != null)
             {
-				return context.DestinationType.IsAssignableFrom(Enum.GetUnderlyingType(sourceEnumType));
+                return context.DestinationType.IsAssignableFrom(Enum.GetUnderlyingType(sourceEnumType));
             }
             if (destEnumType != null)
             {
                 toEnum = true;
-				return context.SourceType.IsAssignableFrom(Enum.GetUnderlyingType(destEnumType));
+                return context.SourceType.IsAssignableFrom(Enum.GetUnderlyingType(destEnumType));
             }
             return false;
         }
 
-        private static bool EnumToStringMapping(ResolutionContext context, ref bool toEnum)
+        public Expression MapExpression(TypeMapRegistry typeMapRegistry, IConfigurationProvider configurationProvider, PropertyMap propertyMap, Expression sourceExpression, Expression destExpression, Expression contextExpression)
         {
-            var sourceEnumType = TypeHelper.GetEnumerationType(context.SourceType);
-            var destEnumType = TypeHelper.GetEnumerationType(context.DestinationType);
-
-            // Enum to string
-            if (sourceEnumType != null)
-            {
-                return context.DestinationType.IsAssignableFrom(typeof(string));
-            }
-            if (destEnumType != null)
-            {
-                toEnum = true;
-                return context.SourceType.IsAssignableFrom(typeof(string));
-            }
-            return false;
+            return Call(null, MapMethodInfo.MakeGenericMethod(sourceExpression.Type, destExpression.Type), sourceExpression);
         }
     }
+    
 }

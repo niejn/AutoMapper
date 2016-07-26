@@ -1,40 +1,21 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using NUnit.Framework;
-using NBehave.Spec.NUnit;
-#if !SILVERLIGHT
-using NUnit.Framework.SyntaxHelpers;
-#endif
+using System.Collections.Specialized;
+using Xunit;
+using Should;
 
 namespace AutoMapper.UnitTests
 {
-    [TestFixture]
     public class CollectionMapping
     {
-        #region Setup/Teardown
-
-        [SetUp]
+        public CollectionMapping()
+        {
+            SetUp();
+        }
         public void SetUp()
         {
-            Mapper.Reset();
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-        }
-
-        #endregion
-
-        [TestFixtureSetUp]
-        public void TestFixtureSetUp()
-        {
-        }
-
-        [TestFixtureTearDown]
-        public void TestFixtureTearDown()
-        {
+            
         }
 
 
@@ -85,6 +66,8 @@ namespace AutoMapper.UnitTests
             public int Id { get; set; }
         }
 
+        private static IMapper mapper;
+
         private static void FillCollection<TSource, TDestination, TSourceItem, TDestinationItem>(
             TSource s, TDestination d,
             Func<TSource, IEnumerable<TSourceItem>> getSourceEnum,
@@ -94,16 +77,20 @@ namespace AutoMapper.UnitTests
             collection.Clear();
             foreach (TSourceItem sourceItem in getSourceEnum(s))
             {
-                collection.Add(Mapper.Map<TSourceItem, TDestinationItem>(sourceItem));
+                collection.Add(mapper.Map<TSourceItem, TDestinationItem>(sourceItem));
             }
         }
 
-        [Test]
+        [Fact]
         public void Should_keep_and_fill_destination_collection_when_collection_is_implemented_as_list()
         {
-            Mapper.CreateMap<MasterDto, MasterWithCollection>()
-                .ForMember(d => d.Details, o => o.UseDestinationValue());
-            Mapper.CreateMap<DetailDto, Detail>();
+            var config = new MapperConfiguration(cfg =>
+            {
+
+                cfg.CreateMap<MasterDto, MasterWithCollection>()
+                    .ForMember(d => d.Details, o => o.UseDestinationValue());
+                cfg.CreateMap<DetailDto, Detail>();
+            });
 
             var dto = new MasterDto
             {
@@ -118,18 +105,21 @@ namespace AutoMapper.UnitTests
             var master = new MasterWithCollection(new List<Detail>());
             ICollection<Detail> originalCollection = master.Details;
 
-            Mapper.Map(dto, master);
+            config.CreateMapper().Map(dto, master);
 
-            Assert.That(master.Details, Is.SameAs(originalCollection));
-            Assert.That(master.Details.Count, Is.EqualTo(originalCollection.Count));
+            originalCollection.ShouldBeSameAs(master.Details);
+            originalCollection.Count.ShouldEqual(master.Details.Count);
         }
 
-        [Test]
+        [Fact]
         public void Should_keep_and_fill_destination_collection_when_collection_is_implemented_as_set()
         {
-            Mapper.CreateMap<MasterDto, MasterWithCollection>()
-                .ForMember(d => d.Details, o => o.UseDestinationValue());
-            Mapper.CreateMap<DetailDto, Detail>();
+            var config = new MapperConfiguration(cfg =>
+            {
+                cfg.CreateMap<MasterDto, MasterWithCollection>()
+                    .ForMember(d => d.Details, o => o.UseDestinationValue());
+                cfg.CreateMap<DetailDto, Detail>();
+            });
 
             var dto = new MasterDto
             {
@@ -144,19 +134,22 @@ namespace AutoMapper.UnitTests
             var master = new MasterWithCollection(new HashSet<Detail>());
             ICollection<Detail> originalCollection = master.Details;
 
-            Mapper.Map(dto, master);
+            config.CreateMapper().Map(dto, master);
 
-            Assert.That(master.Details, Is.SameAs(originalCollection));
-            Assert.That(master.Details.Count, Is.EqualTo(originalCollection.Count));
+            originalCollection.ShouldBeSameAs(master.Details);
+            originalCollection.Count.ShouldEqual(master.Details.Count);
         }
 
-        [Test]
+        [Fact]
         public void Should_keep_and_fill_destination_collection_when_collection_is_implemented_as_set_with_aftermap()
         {
-            Mapper.CreateMap<MasterDto, MasterWithCollection>()
-                .ForMember(d => d.Details, o => o.Ignore())
-                .AfterMap((s, d) => FillCollection(s, d, ss => ss.Details, dd => dd.Details));
-            Mapper.CreateMap<DetailDto, Detail>();
+            var config = new MapperConfiguration(cfg =>
+            {
+                cfg.CreateMap<MasterDto, MasterWithCollection>()
+                    .ForMember(d => d.Details, o => o.Ignore())
+                    .AfterMap((s, d) => FillCollection(s, d, ss => ss.Details, dd => dd.Details));
+                cfg.CreateMap<DetailDto, Detail>();
+            });
 
             var dto = new MasterDto
             {
@@ -171,18 +164,23 @@ namespace AutoMapper.UnitTests
             var master = new MasterWithCollection(new HashSet<Detail>());
             ICollection<Detail> originalCollection = master.Details;
 
-            Mapper.Map(dto, master);
+            mapper = config.CreateMapper();
 
-            Assert.That(master.Details, Is.SameAs(originalCollection));
-            Assert.That(master.Details.Count, Is.EqualTo(originalCollection.Count));
+            mapper.Map(dto, master);
+
+            originalCollection.ShouldBeSameAs(master.Details);
+            originalCollection.Count.ShouldEqual(master.Details.Count);
         }
 
-        [Test]
+        [Fact]
         public void Should_keep_and_fill_destination_list()
         {
-            Mapper.CreateMap<MasterDto, MasterWithList>()
-                .ForMember(d => d.Details, o => o.UseDestinationValue());
-            Mapper.CreateMap<DetailDto, Detail>();
+            var config = new MapperConfiguration(cfg =>
+            {
+                cfg.CreateMap<MasterDto, MasterWithList>()
+                    .ForMember(d => d.Details, o => o.UseDestinationValue());
+                cfg.CreateMap<DetailDto, Detail>();
+            });
 
             var dto = new MasterDto
             {
@@ -197,17 +195,21 @@ namespace AutoMapper.UnitTests
             var master = new MasterWithList();
             IList<Detail> originalCollection = master.Details;
 
-            Mapper.Map(dto, master);
+            config.CreateMapper().Map(dto, master);
 
-            Assert.That(master.Details, Is.SameAs(originalCollection));
-            Assert.That(master.Details.Count, Is.EqualTo(originalCollection.Count));
+            originalCollection.ShouldBeSameAs(master.Details);
+            originalCollection.Count.ShouldEqual(master.Details.Count);
         }
 
-        [Test]
-        public void Should_replace_destination_collection()
+        [Fact]
+        public void Should_not_replace_destination_collection()
         {
-            Mapper.CreateMap<MasterDto, MasterWithCollection>();
-            Mapper.CreateMap<DetailDto, Detail>();
+            var config = new MapperConfiguration(cfg =>
+            {
+                cfg.CreateMap<MasterDto, MasterWithCollection>()
+                    .ForMember(d => d.Details, opt => opt.UseDestinationValue());
+                cfg.CreateMap<DetailDto, Detail>();
+            });
 
             var dto = new MasterDto
             {
@@ -222,16 +224,20 @@ namespace AutoMapper.UnitTests
             var master = new MasterWithCollection(new List<Detail>());
             ICollection<Detail> originalCollection = master.Details;
 
-            Mapper.Map(dto, master);
+            config.CreateMapper().Map(dto, master);
 
-            Assert.That(master.Details, Is.Not.SameAs(originalCollection));
+            originalCollection.ShouldBeSameAs(master.Details);
         }
 
-        [Test]
+        [Fact]
         public void Should_be_able_to_map_to_a_collection_type_that_implements_ICollection_of_T()
         {
-            Mapper.CreateMap<MasterDto, MasterWithNoExistingCollection>();
-            Mapper.CreateMap<DetailDto, Detail>();
+            var config = new MapperConfiguration(cfg =>
+            {
+
+                cfg.CreateMap<MasterDto, MasterWithNoExistingCollection>();
+                cfg.CreateMap<DetailDto, Detail>();
+            });
 
             var dto = new MasterDto
             {
@@ -243,16 +249,20 @@ namespace AutoMapper.UnitTests
                 }
             };
 
-            var master = Mapper.Map<MasterDto, MasterWithNoExistingCollection>(dto);
+            var master = config.CreateMapper().Map<MasterDto, MasterWithNoExistingCollection>(dto);
 
             master.Details.Count.ShouldEqual(2);
         }
 
-        [Test]
-        public void Should_replace_destination_list()
+        [Fact]
+        public void Should_not_replace_destination_list()
         {
-            Mapper.CreateMap<MasterDto, MasterWithList>();
-            Mapper.CreateMap<DetailDto, Detail>();
+            var config = new MapperConfiguration(cfg =>
+            {
+                cfg.CreateMap<MasterDto, MasterWithList>()
+                    .ForMember(d => d.Details, opt => opt.UseDestinationValue());
+                cfg.CreateMap<DetailDto, Detail>();
+            });
 
             var dto = new MasterDto
             {
@@ -267,16 +277,78 @@ namespace AutoMapper.UnitTests
             var master = new MasterWithList();
             IList<Detail> originalCollection = master.Details;
 
-            Mapper.Map(dto, master);
+            config.CreateMapper().Map(dto, master);
 
-            Assert.That(master.Details, Is.Not.SameAs(originalCollection));
+            originalCollection.ShouldBeSameAs(master.Details);
         }
 
-#if SILVERLIGHT
-        public class HashSet<T> : Collection<T>
+        [Fact]
+        public void Should_map_to_NameValueCollection() {
+            // initially results in the following exception:
+            // ----> System.InvalidCastException : Unable to cast object of type 'System.Collections.Specialized.NameValueCollection' to type 'System.Collections.IList'.
+            // this was fixed by adding NameValueCollectionMapper to the MapperRegistry.
+            var c = new NameValueCollection();
+            var config = new MapperConfiguration(cfg => { });
+            var mappedCollection = config.CreateMapper().Map<NameValueCollection, NameValueCollection>(c);
+
+            mappedCollection.ShouldNotBeNull();
+        }
+    }
+
+    public class When_mapping_enumerable_to_array : AutoMapperSpecBase
+    {
+        public class Source
         {
-            
+            public int X { get; set; }
+            public IEnumerable<SourceItem> Items { get; set; }
         }
-#endif
+
+        public class SourceItem
+        {
+            public int I { get; set; }
+        }
+
+        public class Target
+        {
+            public int X { get; set; }
+            public TargetItem[] Items { get; set; }
+        }
+
+        public class TargetItem
+        {
+            public int I { get; set; }
+        }
+
+        protected override MapperConfiguration Configuration { get; } = new MapperConfiguration(cfg =>
+        {
+            cfg.AllowNullCollections = true;
+
+            cfg.CreateMap<Source, Target>();
+            cfg.CreateMap<SourceItem, TargetItem>();
+        });
+
+        [Fact]
+        public void IncludedMappings()
+        {
+            var src = new Source
+            {
+                X = 5,
+                Items = new List<SourceItem>
+                {
+                    new SourceItem {I = 1},
+                    new SourceItem {I = 2},
+                    new SourceItem {I = 3}
+                }
+            };
+
+            var dest = Mapper.Map<Source, Target>(src);
+
+            src.X.ShouldEqual(dest.X);
+
+            dest.Items.Length.ShouldEqual(3);
+            dest.Items[0].I.ShouldEqual(1);
+            dest.Items[1].I.ShouldEqual(2);
+            dest.Items[2].I.ShouldEqual(3);
+        }
     }
 }

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using AutoMapper;
-using NBehave.Spec.NUnit;
+using Should;
 using NUnit.Framework;
 
 namespace AutoMapperSamples.Mappers
@@ -51,12 +51,12 @@ namespace AutoMapperSamples.Mappers
             [Test]
             public void Should_use_the_underlying_list_to_add_values()
             {
-                Mapper.Initialize(cfg =>
+                var config = new MapperConfiguration(cfg =>
                 {
                     cfg.CreateMap<Source, Destination>();
                 });
 
-                var destination = Mapper.Map<Source, Destination>(new Source { Values = new[] { 1, 2, 3 } });
+                var destination = config.CreateMapper().Map<Source, Destination>(new Source { Values = new[] { 1, 2, 3 } });
 
                 destination.Values.Count().ShouldEqual(3);
             }

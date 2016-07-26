@@ -1,5 +1,5 @@
-using NUnit.Framework;
-using NBehave.Spec.NUnit;
+using Xunit;
+using Should;
 
 namespace AutoMapper.UnitTests
 {
@@ -24,17 +24,17 @@ namespace AutoMapper.UnitTests
 				public string CustomerÆøå { get; set; }
 			}
 
-			protected override void Establish_context()
-			{
-				Mapper.CreateMap<Order, OrderDto>();
-			}
+		    protected override MapperConfiguration Configuration { get; } = new MapperConfiguration(cfg =>
+		    {
+		        cfg.CreateMap<Order, OrderDto>();
+		    });
 
 			protected override void Because_of()
 			{
 				_result = Mapper.Map<Order, OrderDto>(new Order {Customer = new Customer {Æøå = "Bob"}});
 			}
 
-			[Test]
+			[Fact]
 			public void Should_match_to_identical_property_name_on_destination()
 			{
 				_result.CustomerÆøå.ShouldEqual("Bob");

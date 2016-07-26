@@ -1,75 +1,133 @@
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-
 namespace AutoMapper.Mappers
 {
-	internal static class TypeHelper
-	{
-		public static Type GetElementType(Type enumerableType)
-		{
-			return GetElementType(enumerableType, null);
-		}
+    using System;
+    using System.Collections;
+    using System.Collections.Generic;
+    using System.Linq;
+    using System.Reflection;
+    using Configuration;
 
-		public static Type GetElementType(Type enumerableType, IEnumerable enumerable)
-		{
-			if (enumerableType.HasElementType)
-			{
-				return enumerableType.GetElementType();
-			}
+    internal static class TypeHelper
+    {
+        public static Type GetElementType(Type enumerableType)
+        {
+            return GetElementTypes(enumerableType, null)[0];
+        }
 
-			if (enumerableType.IsGenericType && enumerableType.GetGenericTypeDefinition().Equals(typeof(IEnumerable<>)))
-			{
-				return enumerableType.GetGenericArguments()[0];
-			}
+        public static Type[] GetElementTypes(Type enumerableType, ElemntTypeFlags flags = ElemntTypeFlags.None)
+        {
+            return GetElementTypes(enumerableType, null, flags);
+        }
+
+        public static Type GetElementType(Type enumerableType, IEnumerable enumerable)
+        {
+            return GetElementTypes(enumerableType, enumerable)[0];
+        }
+
+        public static Type[] GetElementTypes(Type enumerableType, IEnumerable enumerable,
+            ElemntTypeFlags flags = ElemntTypeFlags.None)
+        {
+            if (enumerableType.HasElementType)
+            {
+                return new[] {enumerableType.GetElementType()};
+            }
+
+            if (flags.HasFlag(ElemntTypeFlags.BreakKeyValuePair) && enumerableType.IsGenericType() &&
+                enumerableType.IsDictionaryType())
+            {
+                return enumerableType.GetTypeInfo().GenericTypeArguments;
+            }
+
+            if (enumerableType.IsGenericType() &&
+                enumerableType.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+            {
+                return enumerableType.GetTypeInfo().GenericTypeArguments;
+            }
+
+            Type idictionaryType = enumerableType.GetDictionaryType();
+            if (idictionaryType != null && flags.HasFlag(ElemntTypeFlags.BreakKeyValuePair))
+            {
+                return idictionaryType.GetTypeInfo().GenericTypeArguments;
+            }
 
             Type ienumerableType = GetIEnumerableType(enumerableType);
             if (ienumerableType != null)
-			{
-				return ienumerableType.GetGenericArguments()[0];
-			}
+            {
+                return ienumerableType.GetTypeInfo().GenericTypeArguments;
+            }
 
-			if (typeof(IEnumerable).IsAssignableFrom(enumerableType))
-			{
-				if (enumerable != null)
-				{
-					var first = enumerable.Cast<object>().FirstOrDefault();
-					if (first != null)
-						return first.GetType();
-				}
-				return typeof(object);
-			}
+            if (typeof(IEnumerable).IsAssignableFrom(enumerableType))
+            {
+                var first = enumerable?.Cast<object>().FirstOrDefault();
 
-			throw new ArgumentException(String.Format("Unable to find the element type for type '{0}'.", enumerableType), "enumerableType");
-		}
+                return new[] {first?.GetType() ?? typeof(object)};
+            }
 
-		public static Type GetEnumerationType(Type enumType)
-		{
-			if (enumType.IsNullableType())
-			{
-				enumType = enumType.GetGenericArguments()[0];
-			}
+            throw new ArgumentException($"Unable to find the element type for type '{enumerableType}'.",
+                nameof(enumerableType));
+        }
 
-			if (!enumType.IsEnum)
-				return null;
+        public static Type GetEnumerationType(Type enumType)
+        {
+            if (enumType.IsNullableType())
+            {
+                enumType = enumType.GetTypeInfo().GenericTypeArguments[0];
+            }
 
-			return enumType;
-		}
+            if (!enumType.IsEnum())
+                return null;
+
+            return enumType;
+        }
 
         private static Type GetIEnumerableType(Type enumerableType)
         {
             try
             {
-                return enumerableType.GetInterface("IEnumerable`1", false);
+                return enumerableType.GetTypeInfo().ImplementedInterfaces.FirstOrDefault(t => t.Name == "IEnumerable`1");
             }
-            catch (System.Reflection.AmbiguousMatchException)
+            catch (AmbiguousMatchException)
             {
-                if (enumerableType.BaseType != typeof(object))
-                    return GetIEnumerableType(enumerableType.BaseType);
+                if (enumerableType.BaseType() != typeof(object))
+                    return GetIEnumerableType(enumerableType.BaseType());
 
                 return null;
             }
         }
-	}
+
+        internal static Type FindGenericType(Type definition, Type type)
+        {
+            bool? definitionIsInterface = null;
+            while (type != null && type != typeof(object))
+            {
+                TypeInfo typeInfo = type.GetTypeInfo();
+                if (typeInfo.IsGenericType && typeInfo.GetGenericTypeDefinition() == definition)
+                    return type;
+                if (!definitionIsInterface.HasValue)
+                    definitionIsInterface = definition.GetTypeInfo().IsInterface;
+                if (definitionIsInterface.GetValueOrDefault())
+                {
+                    foreach (Type itype in typeInfo.ImplementedInterfaces)
+                    {
+                        Type found = FindGenericType(definition, itype);
+                        if (found != null)
+                            return found;
+                    }
+                }
+                type = type.GetTypeInfo().BaseType;
+            }
+            return null;
+        }
+
+        internal static IEnumerable<MethodInfo> GetStaticMethods(this Type type)
+        {
+            return type.GetRuntimeMethods().Where(m => m.IsStatic);
+        }
+    }
+
+    public enum ElemntTypeFlags
+    {
+        None = 0,
+        BreakKeyValuePair = 1
+    }
 }

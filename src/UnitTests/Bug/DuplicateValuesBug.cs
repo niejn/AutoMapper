@@ -1,6 +1,6 @@
 using System.Collections.Generic;
-using NUnit.Framework;
-using NBehave.Spec.NUnit;
+using Xunit;
+using Should;
 
 namespace AutoMapper.UnitTests.Bug
 {
@@ -26,7 +26,11 @@ namespace AutoMapper.UnitTests.Bug
 			public int Id;
 			public IList<DestObject> Children;
 
-			public void AddChild(DestObject childObject)
+            public DestObject()
+            {
+            }
+
+            public void AddChild(DestObject childObject)
 			{
 				if (this.Children == null)
 					this.Children = new List<DestObject>();
@@ -34,20 +38,16 @@ namespace AutoMapper.UnitTests.Bug
 				Children.Add(childObject);
 			}
 		}
-
-
-
-		[TestFixture]
-		public class DuplicateValuesIssue : AutoMapperSpecBase
+		public class DuplicateValuesIssue
 		{
-			[Test]
+			[Fact]
 			public void Should_map_the_existing_array_elements_over()
 			{
 				var sourceList = new List<SourceObject>();
 				var destList = new List<DestObject>();
 
-				Mapper.CreateMap<SourceObject, DestObject>();
-				Mapper.AssertConfigurationIsValid();
+				var config = new MapperConfiguration(cfg => cfg.CreateMap<SourceObject, DestObject>().PreserveReferences());
+				config.AssertConfigurationIsValid();
 
 				var source1 = new SourceObject
 				{
@@ -63,12 +63,11 @@ namespace AutoMapper.UnitTests.Bug
 
 				source1.AddChild(source2); // This causes the problem
 
-				DestObject dest1 = new DestObject();
-				Mapper.Map(sourceList, destList);
+				config.CreateMapper().Map(sourceList, destList);
 
 				destList.Count.ShouldEqual(2);
 				destList[0].Children.Count.ShouldEqual(1);
-				destList[0].Children[0].ShouldBeTheSameAs(destList[1]);
+				destList[0].Children[0].ShouldBeSameAs(destList[1]);
 			}
 		}
 	}

@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using AutoMapper;
 using AutoMapper.Mappers;
-using NBehave.Spec.NUnit;
-using NUnit.Framework;
+using Should;
+using Xunit;
 
 namespace AutoMapper.UnitTests.Bug
 {
@@ -23,9 +23,9 @@ namespace AutoMapper.UnitTests.Bug
 		public string Value { get; set; }
 	}
 
-	public class StringToItemConverter : TypeConverter<IEnumerable<string>, IEnumerable<Item>>
+	public class StringToItemConverter : ITypeConverter<IEnumerable<string>, IEnumerable<Item>>
 	{
-		protected override IEnumerable<Item> ConvertCore(IEnumerable<string> source)
+		public IEnumerable<Item> Convert(IEnumerable<string> source, IEnumerable<Item> destination, ResolutionContext context)
 		{
 			var result = new List<Item>();
 			foreach (string s in source)
@@ -34,21 +34,21 @@ namespace AutoMapper.UnitTests.Bug
 			return result;
 		}
 	}
-
-	[TestFixture]
 	public class AutoMapperBugTest
 	{
-		[Test]
+		[Fact]
 		public void ShouldMapOneToTwo()
 		{
-            var config = new ConfigurationStore(new TypeMapFactory(), MapperRegistry.AllMappers());
-			config.CreateMap<One, Two>();
+            var config = new MapperConfiguration(cfg =>
+            {
+                cfg.CreateMap<One, Two>();
 
-			config.CreateMap<IEnumerable<string>, IEnumerable<Item>>().ConvertUsing<StringToItemConverter>();
+                cfg.CreateMap<IEnumerable<string>, IEnumerable<Item>>().ConvertUsing<StringToItemConverter>();
+            });
 
 			config.AssertConfigurationIsValid();
 
-			var engine = new MappingEngine(config);
+			var engine = config.CreateMapper();
 			var one = new One
 			{
 				Stuff = new List<string> { "hi", "", "mom" }

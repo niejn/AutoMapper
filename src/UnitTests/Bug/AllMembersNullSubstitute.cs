@@ -3,13 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using AutoMapper;
 using AutoMapper.Mappers;
-using NBehave.Spec.NUnit;
-using NUnit.Framework;
+using Should;
+using Xunit;
 
 namespace AutoMapper.UnitTests.Bug
 {
-	[TestFixture]
-	public class AllMembersNullSubstituteBug : AutoMapperSpecBase
+	public class AllMembersNullSubstituteBug
 	{
         public class Source
         {
@@ -25,18 +24,18 @@ namespace AutoMapper.UnitTests.Bug
             public string Value3 { get; set; }
         }
 
-		[Test]
+		[Fact]
 		public void Should_map_all_null_values_to_its_substitute()
 		{
-            Mapper.CreateMap<Source, Destination>()
-                .ForAllMembers(opt => opt.NullSubstitute(string.Empty));
+            var config = new MapperConfiguration(cfg => cfg.CreateMap<Source, Destination>()
+                .ForAllMembers(opt => opt.NullSubstitute(string.Empty)));
 
 		    var src = new Source
 		    {
 		        Value1 = 5
 		    };
 
-		    var dest = Mapper.Map<Source, Destination>(src);
+		    var dest = config.CreateMapper().Map<Source, Destination>(src);
 
 		    dest.Value1.ShouldEqual("5");
 		    dest.Value2.ShouldEqual(string.Empty);

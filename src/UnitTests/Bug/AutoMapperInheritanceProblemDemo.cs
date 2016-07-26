@@ -1,75 +1,73 @@
-﻿using NUnit.Framework;
-using NUnit.Framework.SyntaxHelpers;
+﻿using Xunit;
+using Should;
 
 namespace AutoMapper.UnitTests.Bug
 {
-    [TestFixture]
-    public class SettersInBaseClasses
+    public class SettersInBaseClasses : AutoMapperSpecBase
     {
-        [TestFixtureSetUp]
-        public void SetUp(){
-            Mapper.CreateMap<Source, GrandGrandChild>();
-            Mapper.CreateMap<Source, GrandChild>();
-            Mapper.CreateMap<Source, Child>();
+        protected override MapperConfiguration Configuration { get; } = new MapperConfiguration(cfg =>
+        {
+            cfg.CreateMap<Source, GrandGrandChild>();
+            cfg.CreateMap<Source, GrandChild>();
+            cfg.CreateMap<Source, Child>();
+            cfg.CreateMap<Source, GrandGrandChildPrivate>();
+            cfg.CreateMap<Source, GrandChildPrivate>();
+            cfg.CreateMap<Source, ChildPrivate>();
+        });
 
-            Mapper.CreateMap<Source, GrandGrandChildPrivate>();
-            Mapper.CreateMap<Source, GrandChildPrivate>();
-            Mapper.CreateMap<Source, ChildPrivate>();
-        }
-
-        [Test]
+        [Fact]
         public void PublicSetterInParentWorks()
         {
             var source = new Source {ParentProperty = "ParentProperty", ChildProperty = 1};
             var target = Mapper.Map<Source, Child>(source);
-            Assert.That(target.ParentProperty, Is.EqualTo(source.ParentProperty) );
-            Assert.That(target.ChildProperty, Is.EqualTo(source.ChildProperty) );
+            target.ParentProperty.ShouldEqual(source.ParentProperty);
+            target.ChildProperty.ShouldEqual(source.ChildProperty);
         }
 
         
-        [Test]
+        [Fact]
         public void PublicSetterInGrandparentWorks()
         {
             var source = new Source {ParentProperty = "ParentProperty", ChildProperty = 1};
             var target = Mapper.Map<Source, GrandChild>(source);
-            Assert.That(target.ParentProperty, Is.EqualTo(source.ParentProperty) );
-            Assert.That(target.ChildProperty, Is.EqualTo(source.ChildProperty) );
+            target.ParentProperty.ShouldEqual(source.ParentProperty);
+            target.ChildProperty.ShouldEqual(source.ChildProperty);
         }
 
-        [Test]
+        [Fact]
         public void PublicSetterInGrandGrandparentWorks()
         {
             var source = new Source {ParentProperty = "ParentProperty", ChildProperty = 1};
             var target = Mapper.Map<Source, GrandGrandChild>(source);
-            Assert.That(target.ParentProperty, Is.EqualTo(source.ParentProperty) );
-            Assert.That(target.ChildProperty, Is.EqualTo(source.ChildProperty) );
+            target.ParentProperty.ShouldEqual(source.ParentProperty);
+            target.ChildProperty.ShouldEqual(source.ChildProperty);
         }
 
-        [Test]
+        [Fact]
         public void PrivateSetterInParentWorks()
         {
             var source = new Source {ParentProperty = "ParentProperty", ChildProperty = 1};
             var target = Mapper.Map<Source, ChildPrivate>(source);
-            Assert.That(target.ParentProperty, Is.EqualTo(source.ParentProperty) );
-            Assert.That(target.ChildProperty, Is.EqualTo(source.ChildProperty) );
+            target.ParentProperty.ShouldEqual(source.ParentProperty);
+            target.ChildProperty.ShouldEqual(source.ChildProperty);
         }
 
-        [Test]
+        [Fact]
         public void PrivateSetterInGrandparentWorks()
         {
             var source = new Source {ParentProperty = "ParentProperty", ChildProperty = 1};
             var target = Mapper.Map<Source, GrandChildPrivate>(source);
-            Assert.That(target.ParentProperty, Is.EqualTo(source.ParentProperty) );
-            Assert.That(target.ChildProperty, Is.EqualTo(source.ChildProperty) );
+            target.ParentProperty.ShouldEqual(source.ParentProperty);
+            target.ChildProperty.ShouldEqual(source.ChildProperty);
         }
 
-        [Test]
+        [Fact]
         public void PrivateSetterInGrandGrandparentWorks()
         {
             var source = new Source {ParentProperty = "ParentProperty", ChildProperty = 1};
             var target = Mapper.Map<Source, GrandGrandChildPrivate>(source);
-            Assert.That(target.ParentProperty, Is.EqualTo(source.ParentProperty) );
-            Assert.That(target.ChildProperty, Is.EqualTo(source.ChildProperty) );
+            target.ParentProperty.ShouldEqual(source.ParentProperty);
+            target.ChildProperty.ShouldEqual(source.ChildProperty);
         }
     }
 

@@ -1,9 +1,12 @@
-﻿using System;
-
-namespace AutoMapper
+﻿namespace AutoMapper
 {
-	[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false, Inherited = false)]
-	public class IgnoreMapAttribute : Attribute
-	{
-	}
+    using System;
+
+    /// <summary>
+    /// Ignore this member for validation and skip during mapping
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
+    public class IgnoreMapAttribute : Attribute
+    {
+    }
 }

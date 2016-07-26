@@ -1,6 +1,6 @@
 using System;
-using NBehave.Spec.NUnit;
-using NUnit.Framework;
+using Should;
+using Xunit;
 
 namespace AutoMapper.UnitTests
 {
@@ -21,29 +21,29 @@ namespace AutoMapper.UnitTests
 				public string this[string key] { get { return null; }}
 			}
 
-			protected override void Establish_context()
-			{
-				Mapper.CreateMap<Source, Destination>();
-			}
+		    protected override MapperConfiguration Configuration { get; } = new MapperConfiguration(cfg =>
+		    {
+		        cfg.CreateMap<Source, Destination>();
+		    });
 
 			protected override void Because_of()
 			{
 				_result = Mapper.Map<Source, Destination>(new Source {Value = "Bob"});
 			}
 
-			[Test]
+			[Fact]
 			public void Should_ignore_indexers_and_map_successfully()
 			{
 				_result.Value.ShouldEqual("Bob");
 			}
 
-			[Test]
+			[Fact]
 			public void Should_pass_configuration_check()
 			{
 				Exception thrown = null;
 				try
 				{
-					Mapper.AssertConfigurationIsValid();
+					Configuration.AssertConfigurationIsValid();
 				}
 				catch (Exception ex)
 				{

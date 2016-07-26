@@ -1,125 +1,97 @@
-$framework = '4.0'
+Framework '4.5.1x86'
 
 properties {
 	$base_dir = resolve-path .
 	$build_dir = "$base_dir\build"
-	$dist_dir = "$base_dir\release"
 	$source_dir = "$base_dir\src"
-	$tools_dir = "$base_dir\tools"
-	$test_dir = "$build_dir\test"
 	$result_dir = "$build_dir\results"
-	$lib_dir = "$base_dir\lib"
-	$buildNumber = if ($env:build_number -ne $NULL) { $env:build_number } else { '2.0.9999.0' }
-	$config = "debug"
-	$framework_dir = Get-FrameworkDirectory
+	$global:config = "debug"
 }
 
 
 task default -depends local
-task local -depends compile, test
-task full -depends local, merge, dist
-task ci -depends clean, commonAssemblyInfo, local, merge, dist
+task local -depends init, compile, test
+task ci -depends clean, release, local, benchmark
 
 task clean {
-	delete_directory "$build_dir"
-	delete_directory "$dist_dir"
+	rd "$source_dir\artifacts" -recurse -force  -ErrorAction SilentlyContinue | out-null
+	rd "$base_dir\build" -recurse -force  -ErrorAction SilentlyContinue | out-null
 }
 
-task compile -depends clean { 
-    exec { msbuild /t:Clean /t:Build /p:Configuration=Automated$config /v:q /nologo $source_dir\AutoMapper.sln }
+task init {
+	# Make sure per-user dotnet is installed
+	Install-Dotnet
 }
 
-task commonAssemblyInfo {
-    $commit = git log -1 --pretty=format:%H
-    create-commonAssemblyInfo "$buildNumber" "$commit" "$source_dir\CommonAssemblyInfo.cs"
+task release {
+    $global:config = "release"
 }
 
-task merge {
-	create_directory "$build_dir\merge"
-	exec { & $tools_dir\ILMerge\ilmerge.exe /targetplatform:"v4,$framework_dir" /log /out:"$build_dir\merge\AutoMapper.dll" /internalize:AutoMapper.exclude "$build_dir\$config\AutoMapper\AutoMapper.dll" "$build_dir\$config\AutoMapper\Castle.Core.dll" /keyfile:"$source_dir\AutoMapper.snk" }
+task compile -depends clean {
+	$version = if ($env:APPVEYOR_BUILD_NUMBER -ne $NULL) { $env:APPVEYOR_BUILD_NUMBER } else { '0' }
+	$version = "{0:D5}" -f [convert]::ToInt32($version, 10)
+	$version = "5.1.0-alpha-" + $version
+	
+    exec { & $source_dir\.nuget\Nuget.exe restore $source_dir\AutoMapper.sln }
+
+    exec { msbuild /t:Clean /t:Build /p:Configuration=$config /v:q /p:NoWarn=1591 /nologo $source_dir\AutoMapper.sln }
+
+	New-Item -ItemType Directory -Force .\artifacts
+
+	exec { & $source_dir\.nuget\Nuget.exe pack AutoMapper.nuspec -Version $version -Symbols -OutputDirectory .\artifacts }
+	#exec { dotnet pack $source_dir\AutoMapper -c $config --version-suffix $version}
+}
+
+task benchmark {
+    exec { & $source_dir\Benchmark\bin\$config\Benchmark.exe }
 }
 
 task test {
-	create_directory "$build_dir\results"
-    exec { & $tools_dir\nunit\nunit-console-x86.exe $build_dir/$config/UnitTests/AutoMapper.UnitTests.dll /nologo /nodots /xml=$result_dir\AutoMapper.xml }
-    exec { & $tools_dir\Machine.Specifications-net-4.0-Release\mspec.exe --teamcity $build_dir/$config/UnitTests/AutoMapper.UnitTests.dll }
+    $testRunners = @(gci $source_dir\packages -rec -filter Fixie.Console.exe)
+
+    if ($testRunners.Length -ne 1)
+    {
+        throw "Expected to find 1 Fixie.Console.exe, but found $($testRunners.Length)."
+    }
+
+    $testRunner = $testRunners[0].FullName
+
+    exec { & $testRunner $source_dir/UnitTests/bin/$config/AutoMapper.UnitTests.Net4.dll }
+    exec { & $testRunner $source_dir/IntegrationTests.Net4/bin/$config/AutoMapper.IntegrationTests.Net4.dll }
 }
 
-task dist {
-	create_directory $dist_dir
-	$exclude = @('*.pdb')
-	copy_files "$build_dir\merge" "$build_dir\dist-merged" $exclude
-	copy_files "$build_dir\$config\AutoMapper" "$build_dir\dist" $exclude
-	zip_directory "$build_dir\dist" "$dist_dir\AutoMapper-unmerged.zip"
-	copy-item "$build_dir\dist-merged\AutoMapper.dll" "$dist_dir"
-}
-
-# -------------------------------------------------------------------------------------------------------------
-# generalized functions 
-# --------------------------------------------------------------------------------------------------------------
-function Get-FrameworkDirectory()
+function Install-Dotnet
 {
-    $([System.Runtime.InteropServices.RuntimeEnvironment]::GetRuntimeDirectory().Replace("v2.0.50727", "v4.0.30319"))
+    $dotnetcli = where-is('dotnet')
+	
+    if($dotnetcli -eq $null)
+    {
+		$dotnetPath = "$pwd\.dotnet"
+		$dotnetCliVersion = if ($env:DOTNET_CLI_VERSION -eq $null) { 'Latest' } else { $env:DOTNET_CLI_VERSION }
+		$dotnetInstallScriptUrl = 'https://raw.githubusercontent.com/dotnet/cli/rel/1.0.0/scripts/obtain/install.ps1'
+		$dotnetInstallScriptPath = '.\scripts\obtain\install.ps1'
+
+		md -Force ".\scripts\obtain\" | Out-Null
+		curl $dotnetInstallScriptUrl -OutFile $dotnetInstallScriptPath
+		& .\scripts\obtain\install.ps1 -Channel "preview" -version $dotnetCliVersion -InstallDir $dotnetPath -NoPath
+		$env:Path = "$dotnetPath;$env:Path"
+	}
 }
 
-function global:zip_directory($directory, $file)
-{
-    delete_file $file
-    cd $directory
-    exec { & "$tools_dir\7-zip\7za.exe" a $file *.* }
-    cd $base_dir
-}
-
-function global:delete_directory($directory_name)
-{
-  rd $directory_name -recurse -force  -ErrorAction SilentlyContinue | out-null
-}
-
-function global:delete_file($file)
-{
-    if($file) {
-        remove-item $file  -force  -ErrorAction SilentlyContinue | out-null} 
-}
-
-function global:create_directory($directory_name)
-{
-  mkdir $directory_name  -ErrorAction SilentlyContinue  | out-null
-}
-
-function global:copy_files($source, $destination, $exclude = @()) {
-    create_directory $destination
-    Get-ChildItem $source -Recurse -Exclude $exclude | Copy-Item -Destination {Join-Path $destination $_.FullName.Substring($source.length)} 
-}
-
-function global:run_nunit ($test_assembly)
-{
-    exec { & $tools_dir\nunit\nunit-console-x86.exe $test_dir$test_assembly /nologo /nodots /xml=$result_dir$test_assembly.xml }
-}
-
-function global:create-commonAssemblyInfo($version, $commit, $filename)
-{
-	$date = Get-Date
-    "using System;
-using System.Reflection;
-using System.Runtime.InteropServices;
-
-//------------------------------------------------------------------------------
-// <auto-generated>
-//     This code was generated by a tool.
-//     Runtime Version:2.0.50727.4927
-//
-//     Changes to this file may cause incorrect behavior and will be lost if
-//     the code is regenerated.
-// </auto-generated>
-//------------------------------------------------------------------------------
-
-[assembly: ComVisibleAttribute(false)]
-[assembly: AssemblyVersionAttribute(""$version"")]
-[assembly: AssemblyFileVersionAttribute(""$version"")]
-[assembly: AssemblyCopyrightAttribute(""Copyright Jimmy Bogard 2008-" + $date.Year + """)]
-[assembly: AssemblyProductAttribute(""AutoMapper"")]
-[assembly: AssemblyTrademarkAttribute(""$commit"")]
-[assembly: AssemblyCompanyAttribute("""")]
-[assembly: AssemblyConfigurationAttribute(""release"")]
-[assembly: AssemblyInformationalVersionAttribute(""$version"")]"  | out-file $filename -encoding "ASCII"    
+function where-is($command) {
+    (ls env:\path).Value.split(';') | `
+        where { $_ } | `
+        %{ [System.Environment]::ExpandEnvironmentVariables($_) } | `
+        where { test-path $_ } |`
+        %{ ls "$_\*" -include *.bat,*.exe,*cmd } | `
+        %{  $file = $_.Name; `
+            if($file -and ($file -eq $command -or `
+			   $file -eq ($command + '.exe') -or  `
+			   $file -eq ($command + '.bat') -or  `
+			   $file -eq ($command + '.cmd'))) `
+            { `
+                $_.FullName `
+            } `
+        } | `
+        select -unique
 }

@@ -2,58 +2,58 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using NBehave.Spec.NUnit;
-using NUnit.Framework;
+using Should;
+using Xunit;
 
 namespace AutoMapper.UnitTests
 {
 	namespace Dictionaries
 	{
-		[Explicit("Need to resolve the assignable collection bug as well")]
-		public class When_mapping_to_a_non_generic_dictionary : AutoMapperSpecBase
-		{
-			private Destination _result;
+        //[Explicit("Need to resolve the assignable collection bug as well")]
+        //public class When_mapping_to_a_non_generic_dictionary : AutoMapperSpecBase
+        //{
+        //    private Destination _result;
 
-			public class Source
-			{
-				public Hashtable Values { get; set; }
-			}
+        //    public class Source
+        //    {
+        //        public Hashtable Values { get; set; }
+        //    }
 
-			public class Destination
-			{
-				public IDictionary Values { get; set; }
-			}
+        //    public class Destination
+        //    {
+        //        public IDictionary Values { get; set; }
+        //    }
 
-			protected override void Establish_context()
-			{
-				Mapper.CreateMap<Source, Destination>();
-			}
+        //    protected override void Establish_context()
+        //    {
+        //        Mapper.CreateMap<Source, Destination>();
+        //    }
 
-			protected override void Because_of()
-			{
-				var source = new Source
-					{
-						Values = new Hashtable
-							{
-								{"Key1", "Value1"},
-								{"Key2", 4}
-							}
-					};
+        //    protected override void Because_of()
+        //    {
+        //        var source = new Source
+        //            {
+        //                Values = new Hashtable
+        //                    {
+        //                        {"Key1", "Value1"},
+        //                        {"Key2", 4}
+        //                    }
+        //            };
 
-				_result = Mapper.Map<Source, Destination>(source);
-			}
+        //        _result = Mapper.Map<Source, Destination>(source);
+        //    }
 
-			[Test]
-			public void Should_map_the_source_dictionary_with_all_keys_and_values_preserved()
-			{
-				_result.Values.Count.ShouldEqual(2);
+        //    [Fact]
+        //    public void Should_map_the_source_dictionary_with_all_keys_and_values_preserved()
+        //    {
+        //        _result.Values.Count.ShouldEqual(2);
 
-				_result.Values["Key1"].ShouldEqual("Value1");
-				_result.Values["Key2"].ShouldEqual(4);
-			}
-		}
+        //        _result.Values["Key1"].ShouldEqual("Value1");
+        //        _result.Values["Key2"].ShouldEqual(4);
+        //    }
+        //}
 
-		public class When_mapping_to_a_generic_dictionary_with_mapped_value_pairs : SpecBase
+		public class When_mapping_to_a_generic_dictionary_with_mapped_value_pairs : AutoMapperSpecBase
 		{
 			private Destination _result;
 
@@ -77,11 +77,11 @@ namespace AutoMapper.UnitTests
 				public int Value { get; set; }
 			}
 
-			protected override void Establish_context()
-			{
-				Mapper.CreateMap<Source, Destination>();
-				Mapper.CreateMap<SourceValue, DestinationValue>();
-			}
+            protected override MapperConfiguration Configuration { get; } = new MapperConfiguration(cfg => 
+            {
+				cfg.CreateMap<Source, Destination>();
+				cfg.CreateMap<SourceValue, DestinationValue>();
+			});
 
 			protected override void Because_of()
 			{
@@ -97,7 +97,7 @@ namespace AutoMapper.UnitTests
 				_result = Mapper.Map<Source, Destination>(source);
 			}
 
-			[Test]
+			[Fact]
 			public void Should_perform_mapping_for_individual_values()
 			{
 				_result.Values.Count.ShouldEqual(2);
@@ -107,7 +107,7 @@ namespace AutoMapper.UnitTests
 			}
 		}
 
-		public class When_mapping_to_a_generic_dictionary_interface_with_mapped_value_pairs : SpecBase
+		public class When_mapping_to_a_generic_dictionary_interface_with_mapped_value_pairs : AutoMapperSpecBase
 		{
 			private Destination _result;
 
@@ -123,7 +123,7 @@ namespace AutoMapper.UnitTests
 
 			public class Destination
 			{
-				public IDictionary<string, DestinationValue> Values { get; set; }
+				public System.Collections.Generic.IDictionary<string, DestinationValue> Values { get; set; }
 			}
 
 			public class DestinationValue
@@ -131,11 +131,11 @@ namespace AutoMapper.UnitTests
 				public int Value { get; set; }
 			}
 
-			protected override void Establish_context()
-			{
-				Mapper.CreateMap<Source, Destination>();
-				Mapper.CreateMap<SourceValue, DestinationValue>();
-			}
+		    protected override MapperConfiguration Configuration { get; } = new MapperConfiguration(cfg =>
+		    {
+		        cfg.CreateMap<Source, Destination>();
+		        cfg.CreateMap<SourceValue, DestinationValue>();
+		    });
 
 			protected override void Because_of()
 			{
@@ -151,7 +151,7 @@ namespace AutoMapper.UnitTests
 				_result = Mapper.Map<Source, Destination>(source);
 			}
 
-			[Test]
+			[Fact]
 			public void Should_perform_mapping_for_individual_values()
 			{
 				_result.Values.Count.ShouldEqual(2);
@@ -167,20 +167,20 @@ namespace AutoMapper.UnitTests
 
 			public class Foo
 			{
-				public IDictionary<string, Foo> Bar { get; set; }
+				public System.Collections.Generic.IDictionary<string, Foo> Bar { get; set; }
 			}
 
 			public class FooDto
 			{
-				public IDictionary<string, FooDto> Bar { get; set; }
+				public System.Collections.Generic.IDictionary<string, FooDto> Bar { get; set; }
 			}
 
-			protected override void Establish_context()
-			{
-				Mapper.AllowNullDestinationValues = false;
-				Mapper.CreateMap<Foo, FooDto>();
-				Mapper.CreateMap<FooDto, Foo>();
-			}
+		    protected override MapperConfiguration Configuration { get; } = new MapperConfiguration(cfg =>
+		    {
+		        cfg.AllowNullDestinationValues = false;
+		        cfg.CreateMap<Foo, FooDto>();
+		        cfg.CreateMap<FooDto, Foo>();
+		    });
 
 			protected override void Because_of()
 			{
@@ -195,34 +195,34 @@ namespace AutoMapper.UnitTests
 				_result = Mapper.Map<Foo, FooDto>(foo1);
 			}
 
-			[Test]
+			[Fact]
 			public void Should_fill_the_destination_with_an_empty_dictionary()
 			{
 				_result.Bar["lol"].Bar.ShouldNotBeNull();
-				_result.Bar["lol"].Bar.ShouldBeInstanceOf<Dictionary<string, FooDto>>();
+				_result.Bar["lol"].Bar.ShouldBeType<Dictionary<string, FooDto>>();
 			}
 		}
 
 
-		public class When_mapping_to_a_generic_dictionary_that_does_not_use_keyvaluepairs : SpecBase
+		public class When_mapping_to_a_generic_dictionary_that_does_not_use_keyvaluepairs : AutoMapperSpecBase
 		{
-			private IDictionary<string, string> _dest;
+			private System.Collections.Generic.IDictionary<string, string> _dest;
 
 			public class SourceDto
 			{
-				public IDictionary<string, string> Items { get; set; }
+				public System.Collections.Generic.IDictionary<string, string> Items { get; set; }
 			}
 
 			public class DestDto
 			{
-				public IDictionary<string, string> Items { get; set; }
+				public System.Collections.Generic.IDictionary<string, string> Items { get; set; }
 			}
 
-			protected override void Establish_context()
-			{
-				Mapper.CreateMap<SourceDto, DestDto>()
-					.ForMember(d => d.Items, opt => opt.MapFrom(s => s.Items));
-			}
+		    protected override MapperConfiguration Configuration { get; } = new MapperConfiguration(cfg =>
+		    {
+		        cfg.CreateMap<SourceDto, DestDto>()
+		            .ForMember(d => d.Items, opt => opt.MapFrom(s => s.Items));
+		    });
 
 			protected override void Because_of()
 			{
@@ -237,10 +237,10 @@ namespace AutoMapper.UnitTests
 				};
 
 
-				_dest = Mapper.Map<IDictionary<string, string>, IDictionary<string, string>>(source.Items);
+				_dest = Mapper.Map<System.Collections.Generic.IDictionary<string, string>, System.Collections.Generic.IDictionary<string, string>>(source.Items);
 			}
 
-			[Test]
+			[Fact]
 			public void Should_map_using_the_nongeneric_dictionaryentry()
 			{
 				_dest.Values.Count.ShouldEqual(3);
@@ -256,9 +256,9 @@ namespace AutoMapper.UnitTests
 			// This behaviour is demonstrated by NHibernate's PersistentGenericMap
 			// (which wraps a nongeneric PersistentMap).
 			public class GenericWrappedDictionary<TKey, TValue> :
-				IDictionary<TKey, TValue>, IDictionary
+				System.Collections.Generic.IDictionary<TKey, TValue>, System.Collections.IDictionary
 			{
-				IDictionary inner = new Hashtable();
+                System.Collections.IDictionary inner = new Dictionary<TKey, TValue>();
 
 				public void Add(TKey key, TValue value)
 				{
@@ -339,9 +339,7 @@ namespace AutoMapper.UnitTests
 
 				public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
 				{
-					return inner.OfType<DictionaryEntry>()
-						.Select(e => new KeyValuePair<TKey, TValue>((TKey)e.Key, (TValue)e.Value))
-						.GetEnumerator();
+				    return inner.GetEnumerator() as IEnumerator<KeyValuePair<TKey, TValue>>;
 				}
 
 				IEnumerator IEnumerable.GetEnumerator()
@@ -359,9 +357,9 @@ namespace AutoMapper.UnitTests
 					throw new NotImplementedException();
 				}
 
-				IDictionaryEnumerator IDictionary.GetEnumerator()
+                IDictionaryEnumerator System.Collections.IDictionary.GetEnumerator()
 				{
-					return ((IDictionary)inner).GetEnumerator();
+					return ((System.Collections.IDictionary)inner).GetEnumerator();
 				}
 
 				public bool IsFixedSize
@@ -369,7 +367,7 @@ namespace AutoMapper.UnitTests
 					get { throw new NotImplementedException(); }
 				}
 
-				ICollection IDictionary.Keys
+				ICollection System.Collections.IDictionary.Keys
 				{
 					get { return inner.Keys; }
 				}
@@ -379,7 +377,7 @@ namespace AutoMapper.UnitTests
 					throw new NotImplementedException();
 				}
 
-				ICollection IDictionary.Values
+                ICollection System.Collections.IDictionary.Values
 				{
 					get { return inner.Values; }
 				}
@@ -414,7 +412,7 @@ namespace AutoMapper.UnitTests
 
 		}
 
-		public class When_mapping_from_a_list_of_object_to_generic_dictionary : SpecBase
+		public class When_mapping_from_a_list_of_object_to_generic_dictionary : AutoMapperSpecBase	
 		{
 			private FooObject _result;
 
@@ -425,21 +423,21 @@ namespace AutoMapper.UnitTests
 
 			public class FooObject
 			{
-				public Dictionary<string, string> Values { get; set; }
+				public IDictionary<string, string> Values { get; set; }
 			}
 
-			public class DestinationValuePair
+            public class DestinationValuePair
 			{
 				public string Key { get; set; }
 				public string Value { get; set; }
 			}
 
-			protected override void Establish_context()
-			{
-				Mapper.CreateMap<FooDto, FooObject>();
-				Mapper.CreateMap<DestinationValuePair, KeyValuePair<string, string>>()
-					.ConvertUsing(src => new KeyValuePair<string, string>(src.Key, src.Value));
-			}
+		    protected override MapperConfiguration Configuration { get; } = new MapperConfiguration(cfg =>
+		    {
+		        cfg.CreateMap<FooDto, FooObject>();
+		        cfg.CreateMap<DestinationValuePair, KeyValuePair<string, string>>()
+		            .ConvertUsing(src => new KeyValuePair<string, string>(src.Key, src.Value));
+		    });
 
 			protected override void Because_of()
 			{
@@ -455,7 +453,7 @@ namespace AutoMapper.UnitTests
 				_result = Mapper.Map<FooDto, FooObject>(source);
 			}
 
-			[Test]
+			[Fact]
 			public void Should_perform_mapping_for_individual_values()
 			{
 				_result.Values.Count.ShouldEqual(2);
@@ -464,5 +462,25 @@ namespace AutoMapper.UnitTests
 				_result.Values["Key2"].ShouldEqual("Value2");
 			}
 		}
-	}
+
+        public class When_mapping_nongeneric_type_inherited_from_dictionary : AutoMapperSpecBase
+        {
+            public class BaseClassWithDictionary
+            {
+                public DataDictionary Data { get; set; }
+            }
+
+            public class DerivedClassWithDictionary : BaseClassWithDictionary { }
+
+            public class DataDictionary : Dictionary<string, object>
+            {
+                public string GetString(string name, string @default)
+                {
+                    return null;
+                }
+            }
+
+            protected override MapperConfiguration Configuration { get; } = new MapperConfiguration(cfg => cfg.CreateMap<BaseClassWithDictionary, DerivedClassWithDictionary>());
+        }
+    }
 }

@@ -1,19 +1,22 @@
-namespace AutoMapper.Mappers
+﻿namespace AutoMapper.Mappers
 {
-	public class StringMapper : IObjectMapper
-	{
-		public object Map(ResolutionContext context, IMappingEngineRunner mapper)
-		{
-			if (context.SourceValue == null)
-			{
-				return mapper.FormatValue(context.CreateValueContext(null));
-			}
-			return mapper.FormatValue(context);
-		}
+    using System.Linq.Expressions;
+    using static System.Linq.Expressions.Expression;
 
-		public bool IsMatch(ResolutionContext context)
-		{
-			return context.DestinationType.Equals(typeof(string));
-		}
-	}
+    public class StringMapper : IObjectMapper
+    {
+        public bool IsMatch(TypePair context)
+        {
+            return context.DestinationType == typeof(string) && context.SourceType != typeof(string);
+        }
+
+        public Expression MapExpression(TypeMapRegistry typeMapRegistry, IConfigurationProvider configurationProvider,
+            PropertyMap propertyMap, Expression sourceExpression, Expression destExpression,
+            Expression contextExpression)
+        {
+            return Condition(Equal(sourceExpression, Default(sourceExpression.Type)),
+                Constant(null, typeof(string)),
+                Call(sourceExpression, typeof(object).GetDeclaredMethod("ToString")));
+        }
+    }
 }

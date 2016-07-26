@@ -1,65 +1,32 @@
-using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
+using System.Linq;
+using System.Linq.Expressions;
+using static System.Linq.Expressions.Expression;
 
 namespace AutoMapper.Mappers
 {
+    using System.Collections.Generic;
+    using System.Collections.ObjectModel;
+    using Configuration;
+
     public class ReadOnlyCollectionMapper : IObjectMapper
     {
-        public object Map(ResolutionContext context, IMappingEngineRunner mapper)
+        public bool IsMatch(TypePair context)
         {
-            Type genericType = typeof(EnumerableMapper<>);
+            if (!(context.SourceType.IsEnumerableType() && context.DestinationType.IsGenericType()))
+                return false;
 
-            var elementType = TypeHelper.GetElementType(context.DestinationType);
-            
-            var enumerableMapper = genericType.MakeGenericType(elementType);
+            var genericType = context.DestinationType.GetGenericTypeDefinition();
 
-            var objectMapper = (IObjectMapper)Activator.CreateInstance(enumerableMapper);
-
-            return objectMapper.Map(context, mapper);
+            return genericType == typeof (ReadOnlyCollection<>);
         }
 
-        public bool IsMatch(ResolutionContext context)
+        public Expression MapExpression(TypeMapRegistry typeMapRegistry, IConfigurationProvider configurationProvider, PropertyMap propertyMap, Expression sourceExpression, Expression destExpression, Expression contextExpression)
         {
-            var isMatch = context.SourceType.IsEnumerableType() &&
-                          context.DestinationType.IsGenericType &&
-                          context.DestinationType.GetGenericTypeDefinition() == typeof (ReadOnlyCollection<>);
+            var listType = typeof(List<>).MakeGenericType(TypeHelper.GetElementType(destExpression.Type));
+            var list = typeMapRegistry.MapCollectionExpression(configurationProvider, propertyMap, sourceExpression, Default(listType), contextExpression, _ => Constant(false), typeof(List<>), CollectionMapperExtensions.MapItemExpr);
+            var dest = Variable(listType, "dest");
 
-            return isMatch;
+            return Block(new[] { dest }, Assign(dest, list), Condition(NotEqual(dest, Default(listType)), New(destExpression.Type.GetConstructors().First(), dest), Default(destExpression.Type)));
         }
-
-        #region Nested type: EnumerableMapper
-
-        private class EnumerableMapper<TElement> : EnumerableMapperBase<IList<TElement>>
-        {
-            private readonly IList<TElement> inner = new List<TElement>();
-            
-            public override bool IsMatch(ResolutionContext context)
-            {
-                throw new NotImplementedException();
-            }
-
-            protected override void SetElementValue(IList<TElement> elements, object mappedValue, int index)
-            {
-                inner.Add((TElement)mappedValue);
-            }
-
-            protected override IList<TElement> GetEnumerableFor(object destination)
-            {
-                return inner;
-            }
-
-            protected override IList<TElement> CreateDestinationObjectBase(Type destElementType, int sourceLength)
-            {
-                throw new NotImplementedException();
-            }
-
-            protected override object CreateDestinationObject(ResolutionContext context, Type destinationElementType, int count, IMappingEngineRunner mapper)
-            {
-                return new ReadOnlyCollection<TElement>(inner);
-            }
-        }
-
-        #endregion
     }
 }

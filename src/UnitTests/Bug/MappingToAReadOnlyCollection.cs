@@ -1,7 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
-using NBehave.Spec.NUnit;
-using NUnit.Framework;
+using Should;
+using Xunit;
 
 namespace AutoMapper.UnitTests.Bug
 {
@@ -21,10 +21,10 @@ namespace AutoMapper.UnitTests.Bug
             public ReadOnlyCollection<int> Values2 { get; set; }
         }
 
-        protected override void Establish_context()
+        protected override MapperConfiguration Configuration { get; } = new MapperConfiguration(cfg =>
         {
-            Mapper.CreateMap<Source, Destination>();
-        }
+            cfg.CreateMap<Source, Destination>();
+        });
 
         protected override void Because_of()
         {
@@ -36,7 +36,7 @@ namespace AutoMapper.UnitTests.Bug
             _destination = Mapper.Map<Source, Destination>(source);
         }
 
-        [Test]
+        [Fact]
         public void Should_map_the_list_of_source_items()
         {
             _destination.Values.ShouldNotBeNull();

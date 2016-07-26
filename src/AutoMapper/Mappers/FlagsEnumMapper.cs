@@ -1,31 +1,39 @@
-using System;
-using System.Linq;
+using System.Linq.Expressions;
+using System.Reflection;
+using AutoMapper.Execution;
 
 namespace AutoMapper.Mappers
 {
-	public class FlagsEnumMapper : IObjectMapper
-	{
-		public object Map(ResolutionContext context, IMappingEngineRunner mapper)
-		{
-			Type enumDestType = TypeHelper.GetEnumerationType(context.DestinationType);
+    using System;
+    using System.Linq;
 
-			if (context.SourceValue == null)
-			{
-				return mapper.CreateObject(context);				
-			}
+    public class FlagsEnumMapper : IObjectMapper
+    {
+        public static TDestination Map<TSource, TDestination>(TSource source, Func<TDestination> ifNull)
+        {
+            if (source == null)
+                return ifNull();
 
-			return Enum.Parse(enumDestType, context.SourceValue.ToString(), true);
-		}
+            Type enumDestType = TypeHelper.GetEnumerationType(typeof(TDestination));
+            return (TDestination)Enum.Parse(enumDestType, source.ToString(), true);
+        }
 
-		public bool IsMatch(ResolutionContext context)
-		{
-			var sourceEnumType = TypeHelper.GetEnumerationType(context.SourceType);
-			var destEnumType = TypeHelper.GetEnumerationType(context.DestinationType);
+        private static readonly MethodInfo MapMethodInfo = typeof(FlagsEnumMapper).GetAllMethods().First(_ => _.IsStatic);
 
-			return sourceEnumType != null
-				&& destEnumType != null
-				&& sourceEnumType.GetCustomAttributes(typeof(FlagsAttribute), false).Any()
-				&& destEnumType.GetCustomAttributes(typeof(FlagsAttribute), false).Any();
-		}
-	}
+        public bool IsMatch(TypePair context)
+        {
+            var sourceEnumType = TypeHelper.GetEnumerationType(context.SourceType);
+            var destEnumType = TypeHelper.GetEnumerationType(context.DestinationType);
+
+            return sourceEnumType != null
+                   && destEnumType != null
+                   && sourceEnumType.GetCustomAttributes(typeof (FlagsAttribute), false).Any()
+                   && destEnumType.GetCustomAttributes(typeof (FlagsAttribute), false).Any();
+        }
+
+        public Expression MapExpression(TypeMapRegistry typeMapRegistry, IConfigurationProvider configurationProvider, PropertyMap propertyMap, Expression sourceExpression, Expression destExpression, Expression contextExpression)
+        {
+            return Expression.Call(null, MapMethodInfo.MakeGenericMethod(sourceExpression.Type, destExpression.Type), sourceExpression, Expression.Constant(CollectionMapperExtensions.Constructor(destExpression.Type)));
+        }
+    }
 }

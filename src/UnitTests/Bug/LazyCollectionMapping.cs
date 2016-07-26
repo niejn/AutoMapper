@@ -2,18 +2,20 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using NBehave.Spec.NUnit;
-using NUnit.Framework;
+using Should;
+using Xunit;
 
 namespace AutoMapper.UnitTests.Bug
 {
-	[TestFixture]
 	public class LazyCollectionMapping
 	{
-		[SetUp]
+        public LazyCollectionMapping()
+        {
+            SetUp();
+        }
 		public void SetUp()
 		{
-			Mapper.Reset();
+			
 		}
 
 		public class OneTimeEnumerator<T> : IEnumerable<T>
@@ -51,7 +53,7 @@ namespace AutoMapper.UnitTests.Bug
 			public IEnumerable<string> Collection { get; set; }
 		}
 
-		[Test]
+		[Fact]
 		public void OneTimeEnumerator_should_throw_exception_if_enumerating_twice()
 		{
 			IEnumerable<string> enumerable = Create(new[] {"one", "two", "three"});
@@ -61,13 +63,13 @@ namespace AutoMapper.UnitTests.Bug
 			typeof (NotSupportedException).ShouldBeThrownBy(() => enumerable.Count());
 		}
 		
-		[Test]
+		[Fact]
 		public void Should_not_enumerate_twice()
 		{
-			Mapper.CreateMap<Source, Destination>();
+            var config = new MapperConfiguration(cfg => cfg.CreateMap<Source, Destination>());
 
 			var source = new Source {Collection = Create(new[] {"one", "two", "three"})};
-			var enumerable = Mapper.Map(source, new Destination());
+			var enumerable = config.CreateMapper().Map(source, new Destination());
 
 			enumerable.Collection.Count().ShouldEqual(3);
 		}

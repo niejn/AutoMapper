@@ -5,7 +5,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using AutoMapper;
-using NBehave.Spec.NUnit;
+using Should;
 
 namespace AutoMapper.UnitTests.Bug
 {
@@ -15,14 +15,11 @@ namespace AutoMapper.UnitTests.Bug
         #region Dto objects
         public abstract class DynamicPropertyDTO<T>
         {
-            public abstract event PropertyChangedEventHandler PropertyChanged;
         }
 
         public class ComplexPropertyDTO<T> : DynamicPropertyDTO<T>
         {
             public Dictionary<string, object> Properties { get; set; }
-
-            public override event PropertyChangedEventHandler PropertyChanged;
 
             public ComplexPropertyDTO()
             {
@@ -81,6 +78,7 @@ namespace AutoMapper.UnitTests.Bug
         {
             public Dictionary<string, object> Properties { get; set; }
 
+            #pragma warning disable 67
             public override event PropertyChangedEventHandler PropertyChanged;
 
             public ComplexProperty()
@@ -91,6 +89,7 @@ namespace AutoMapper.UnitTests.Bug
 
         public class SimpleProperty<T> : DynamicProperty<T>
         {
+            #pragma warning disable 67
             public override event PropertyChangedEventHandler PropertyChanged;
         }
 
@@ -165,29 +164,33 @@ namespace AutoMapper.UnitTests.Bug
                 };
                 entity.Components.Add("2", locationComponent);
 
-                Mapper.CreateMap<ComponentContainer, ComponentContainerDTO>()
-                    .Include<Entity, EntityDTO>();
+                var config = new MapperConfiguration(cfg =>
+                {
 
-                Mapper.CreateMap<Entity, EntityDTO>();
+                    cfg.CreateMap<ComponentContainer, ComponentContainerDTO>()
+                        .Include<Entity, EntityDTO>();
 
-                Mapper.CreateMap<Component, ComponentDTO>()
-                    .Include<Health, HealthDTO>()
-                    .Include<PhysicalLocation, PhysicalLocationDTO>();
+                    cfg.CreateMap<Entity, EntityDTO>();
 
-                Mapper.CreateMap<Health, HealthDTO>();
-                Mapper.CreateMap<PhysicalLocation, PhysicalLocationDTO>();
+                    cfg.CreateMap<Component, ComponentDTO>()
+                        .Include<Health, HealthDTO>()
+                        .Include<PhysicalLocation, PhysicalLocationDTO>();
 
-                Mapper.AssertConfigurationIsValid();
+                    cfg.CreateMap<Health, HealthDTO>();
+                    cfg.CreateMap<PhysicalLocation, PhysicalLocationDTO>();
+                });
 
-                EntityDTO targetEntity = Mapper.Map<Entity, EntityDTO>(entity);
+                config.AssertConfigurationIsValid();
+
+                EntityDTO targetEntity = config.CreateMapper().Map<Entity, EntityDTO>(entity);
 
                 targetEntity.Components.Count.ShouldEqual(2);
 
                 targetEntity.Components.Last().Value.Name.ShouldEqual("PhysicalLocation");
 
-                targetEntity.Components.First().Value.ShouldBeInstanceOf<HealthDTO>();
+                targetEntity.Components.First().Value.ShouldBeType<HealthDTO>();
 
-                targetEntity.Components.Last().Value.ShouldBeInstanceOf<PhysicalLocationDTO>();
+                targetEntity.Components.Last().Value.ShouldBeType<PhysicalLocationDTO>();
             }
         }
     }

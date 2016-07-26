@@ -2,8 +2,8 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using NBehave.Spec.NUnit;
-using NUnit.Framework;
+using Should;
+using Xunit;
 using System.Linq;
 
 namespace AutoMapper.UnitTests
@@ -24,17 +24,16 @@ namespace AutoMapper.UnitTests
 		{
 			public Guid Id { get; set; }
 		}
-
-		[TestFixture]
-		public class automapper_fails_to_map_custom_mappings_when_mapping_collections_for_an_interface
+		public class automapper_fails_to_map_custom_mappings_when_mapping_collections_for_an_interface : AutoMapperSpecBase
 		{
-			[SetUp]
-			public void Setup()
-			{
-				Mapper.Reset();
-			}
+		    protected override MapperConfiguration Configuration { get; } = new MapperConfiguration(cfg =>
+		    {
+				cfg.CreateMap<ITestDomainItem, TestDtoItem>()
+					.ForMember(d => d.Id, s => s.MapFrom(x => x.ItemId));
+		    });
 
-			[Test]
+
+            [Fact]
 			public void should_map_the_id_property()
 			{
 				var domainItems = new List<ITestDomainItem>
@@ -42,14 +41,10 @@ namespace AutoMapper.UnitTests
                     new TestDomainItem {ItemId = Guid.NewGuid()},
                     new TestDomainItem {ItemId = Guid.NewGuid()}
                 };
-				Mapper.CreateMap<ITestDomainItem, TestDtoItem>()
-					.ForMember(d => d.Id, s => s.MapFrom(x => x.ItemId));
-
-				Mapper.AssertConfigurationIsValid();
 
 				var dtos = Mapper.Map<IEnumerable<ITestDomainItem>, TestDtoItem[]>(domainItems);
 
-				Assert.AreEqual(domainItems[0].ItemId, dtos[0].Id);
+				domainItems[0].ItemId.ShouldEqual(dtos[0].Id);
 			}
 		}
 
@@ -81,25 +76,26 @@ namespace AutoMapper.UnitTests
 				}
 			}
 
-			protected override void Establish_context()
-			{
-				Mapper.CreateMap<Source, Destination>();
-				Mapper.CreateMap<DateTime?, MyCustomDate>()
-					.ConvertUsing(src => src.HasValue ? new MyCustomDate(src.Value.Day, src.Value.Month, src.Value.Year) : null);
-			}
+		    protected override MapperConfiguration Configuration { get; } = new MapperConfiguration(cfg =>
+		    {
+		        cfg.CreateMap<Source, Destination>();
+		        cfg.CreateMap<DateTime?, MyCustomDate>()
+		            .ConvertUsing(
+		                src => src.HasValue ? new MyCustomDate(src.Value.Day, src.Value.Month, src.Value.Year) : null);
+		    });
 
 			protected override void Because_of()
 			{
 				_result = Mapper.Map<Source, Destination>(new Source { SomeDate = new DateTime(2005, 12, 1) });
 			}
 
-			[Test]
+			[Fact]
 			public void Should_map_a_date_with_a_value()
 			{
 				_result.SomeDate.Day.ShouldEqual(1);
 			}
 
-			[Test]
+			[Fact]
 			public void Should_map_null_to_null()
 			{
 				var destination = Mapper.Map<Source, Destination>(new Source());
@@ -107,58 +103,14 @@ namespace AutoMapper.UnitTests
 			}
 		}
 
-		public class When_mappings_are_created_on_the_fly : NonValidatingSpecBase
-		{
-			private Order _order;
-
-			public class Order
-			{
-				public string Name { get; set; }
-				public Product Product { get; set; }
-			}
-
-			public class Product
-			{
-				public string ProductName { get; set; }
-			}
-
-			[Test]
-			public void Should_not_use_AssignableMapper_when_mappings_are_specified_on_the_fly()
-			{
-				Mapper.CreateMap<Order, Order>();
-
-				var sourceOrder = new Order()
-				{
-					Name = "order",
-					Product = new Product() { ProductName = "product" }
-				};
-				var destinationOrder = new Order();
-				destinationOrder = Mapper.Map(sourceOrder, destinationOrder);
-
-				// Defining this mapping on the fly, but since the previous call to Mapper.Map()
-				// had to deal with mapping Product to Product, it created an AssignableMapper
-				// which will get used in place of this one.  I would expect that if I call
-				// Mapper.CreateMap(), that should replace any cached value in
-				// MappingEngine._objectMapperCache.
-				Mapper.CreateMap<Product, Product>();
-
-				var sourceProduct = new Product() { ProductName = "name" };
-				var destinationProduct = new Product();
-				destinationProduct = Mapper.Map(sourceProduct, destinationProduct);
-
-				sourceProduct.ProductName.ShouldEqual(destinationProduct.ProductName);
-				sourceProduct.ShouldNotEqual(destinationProduct);
-			}
-		}
-
 		public class TestEnumerable : AutoMapperSpecBase
 		{
-			protected override void Establish_context()
-			{
-				Mapper.CreateMap<Person, PersonModel>();
-			}
+		    protected override MapperConfiguration Configuration { get; } = new MapperConfiguration(cfg =>
+		    {
+		        cfg.CreateMap<Person, PersonModel>();
+		    });
 
-			[Test]
+			[Fact]
 			public void MapsEnumerableTypes()
 			{
 				Person[] personArr = new[] {new Person() {Name = "Name"}};
@@ -166,8 +118,8 @@ namespace AutoMapper.UnitTests
 				
 				var pmc = Mapper.Map<People, List<PersonModel>>(people);
 				
-				Assert.IsNotNull(pmc);
-				Assert.IsTrue(pmc.Count == 1);
+				pmc.ShouldNotBeNull();
+				(pmc.Count == 1).ShouldBeTrue();
 			}
 
 			public class People : IEnumerable
